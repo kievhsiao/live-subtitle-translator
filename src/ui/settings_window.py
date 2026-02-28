@@ -32,7 +32,8 @@ class SettingsWindow(QMainWindow):
         except Exception:
             self.config = {}
 
-    def _save_config(self):
+    def save_config(self):
+        """Gather all UI values, save to file, and emit signal."""
         # Update API Keys
         self.config['api_keys']['google'] = self.google_key.text()
         self.config['api_keys']['deepl'] = self.deepl_key.text()
@@ -169,7 +170,7 @@ class SettingsWindow(QMainWindow):
         self.start_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
         
         self.save_btn = QPushButton("儲存設定")
-        self.save_btn.clicked.connect(self._save_config)
+        self.save_btn.clicked.connect(self.save_config)
         
         btn_layout.addWidget(self.save_btn)
         btn_layout.addWidget(self.start_btn)

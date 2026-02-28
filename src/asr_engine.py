@@ -8,7 +8,7 @@ from src.processor_numpy import LightProcessor
 class ASREngine:
     """ASR Engine using OpenVINO for Qwen3-ASR-0.6B."""
     
-    def __init__(self):
+    def __init__(self, use_gpu_preload=False):
         self.ready = False
         self._lock = threading.Lock()
         
@@ -23,6 +23,21 @@ class ASREngine:
         
         # PyTorch resources
         self.pt_model = None
+        
+        # 啟動智慧背景預載：僅在 GPU 模式且使用者同意時執行，避免 CPU 模式下的資源浪費
+        if use_gpu_preload:
+            threading.Thread(target=self._preload, daemon=True).start()
+
+    def _preload(self):
+        """背景預載重型程式庫 (僅針對 GPU 模式)"""
+        try:
+            import torch
+            from qwen_asr import Qwen3ASRModel
+            # 觸發一次 cuda 檢查，預先建立 cuda context (如果是 GPU 環境)
+            if torch.cuda.is_available():
+                _ = torch.cuda.device_count()
+        except Exception:
+            pass
 
     def load(self, model_dir: str | None = None, device: str = "CPU"):
         """
@@ -49,12 +64,14 @@ class ASREngine:
             self._load_pytorch(device, target_dir)
 
     def _load_pytorch(self, requested_device: str, local_model_dir_str: str):
+        # 先印出 Loading 提示，給使用者即時回饋，而不是卡在 import 裡
+        local_model_dir = Path(local_model_dir_str)
+        print(f"Loading PyTorch ASR model from local path ({local_model_dir}) offline...")
+        
         import torch
-        import os
         from qwen_asr import Qwen3ASRModel
         from huggingface_hub import snapshot_download
         
-        local_model_dir = Path(local_model_dir_str)
         if not local_model_dir.exists():
             print("Downloading Qwen3-ASR-0.6B to local GPU model directory (This only happens once)...")
             local_model_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -64,8 +81,6 @@ class ASREngine:
                 local_dir_use_symlinks=False,
                 resume_download=True
             )
-        
-        print(f"Loading PyTorch ASR model from local path ({local_model_dir}) offline...")
         
         try:
             pt_device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -113,9 +128,9 @@ class ASREngine:
             self.processor = LightProcessor(ov_dir)
             self.pad_id = self.processor.pad_id
             self.ready = True
-            print("ASR model loaded successfully.")
+            print("OpenVINO ASR model loaded successfully.")
         except Exception as e:
-            print(f"Failed to load ASR model: {e}")
+            print(f"Failed to load OpenVINO ASR model: {e}")
             raise
 
     def transcribe(self, audio: np.ndarray, max_tokens: int = 300, language: str | None = None, context: str | None = None) -> str:
@@ -194,18 +209,10 @@ class ASREngine:
             logits = list(out.values())[0]
             nxt = int(np.argmax(logits[0, -1, :]))
             cur += 1
-            
-        print(f"DEBUG - Generated tokens: {gen}")
         
         # 5. Decode tokens to text
         raw = self.processor.decode(gen)
-        print(f"DEBUG - Raw decoded string: {repr(raw)}")
         
         if "<asr_text>" in raw:
             raw = raw.split("<asr_text>", 1)[1]
         return raw.strip()
-
-if __name__ == "__main__":
-    # Example usage (test)
-    engine = ASREngine()
-    print("ASR Engine initialized.")

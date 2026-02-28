@@ -35,7 +35,12 @@ class TranslatorApp:
         
         # Engines
         self.vad = VADEngine(threshold=self.config['asr']['vad_threshold'])
-        self.asr = ASREngine()
+        
+        # 智慧判斷是否需要預載 GPU 資源
+        asr_device = self.config['asr'].get('device', 'CPU').upper()
+        use_gpu_preload = asr_device == 'GPU' or asr_device.startswith('CUDA')
+        
+        self.asr = ASREngine(use_gpu_preload=use_gpu_preload)
         self.translator = Translator(
             provider=self.config['translation_provider'],
             api_key=self.config['api_keys'].get(self.config['translation_provider']),
@@ -79,6 +84,9 @@ class TranslatorApp:
         if self.running:
             return
             
+        # 點擊啟動即自動儲存與套用目前介面上的所有設定值
+        self.settings_window.save_config()
+        
         self.settings_window.start_btn.setEnabled(False)
         self.settings_window.start_btn.setText("正在啟動 ASR...")
         

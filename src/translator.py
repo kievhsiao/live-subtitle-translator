@@ -2,6 +2,7 @@ import asyncio
 import aiohttp
 import os
 from google import genai
+from google.genai import types
 from google.cloud import translate_v2 as translate
 import deepl
 
@@ -56,19 +57,27 @@ class Translator:
 
     async def _translate_gemini(self, text, source_lang):
         try:
-            prompt = (
-                f"你是一個專業的影視翻譯。請將以下 {source_lang} 的語音辨識文字翻譯成自然流暢的 繁體中文。\n"
-                "規則：\n"
-                "1. 只輸出翻譯內容，不要有任何解釋。\n"
-                "2. 語氣要口語且自然。\n"
-                "3. 保持繁體中文 (Taiwan standard) 的用語規範。\n\n"
-                f"文字：{text}"
+            # 防禦性檢查：確保 client 已初始化
+            if not hasattr(self, 'client') or self.client is None:
+                self._init_provider()
+            
+            if not hasattr(self, 'client') or self.client is None:
+                print("Gemini client not initialized. Check API Key.")
+                return text
+
+            system_instr = (
+                f"你是一個專業的影視翻譯。請將使用者輸入的 {source_lang} 語音辨識文字翻譯成自然流暢的繁體中文。\n"
+                "規則：1. 只輸出翻譯內容。 2. 語氣口語自然。 3. 保持台灣繁體中文用語。"
             )
+
             # Use asyncio.to_thread for synchronous SDK call
             response = await asyncio.to_thread(
                 self.client.models.generate_content,
-                model='gemini-1.5-flash',
-                contents=prompt
+                model='gemini-2.5-flash-lite', # 官方 2025 低延遲首選模型
+                contents=text,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instr
+                )
             )
             return response.text.strip()
         except Exception as e:
