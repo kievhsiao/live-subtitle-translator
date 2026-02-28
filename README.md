@@ -45,8 +45,14 @@ uv pip install -r requirements.txt
   - `CPU`: 使用 OpenVINO 模式。
   - `CUDA`: 使用 NVIDIA GPU PyTorch 模式。
   - `CUDA:X`: (例如: `CUDA:0`) 指定特定的 NVIDIA 顯卡。
-- **asr.max_silence_seconds**: 語音切分門檻。靜音超過此秒數即送出辨識 (預設 `0.5`)。
-- **asr.max_segment_seconds**: 單句最長秒數。達到此秒數即強行切分，防止延遲 (預設 `10.0`)。
+- **asr.vad_threshold**: 人聲偵測靈敏度 (預設 `0.3`)。
+  - 數值越**低**：更敏銳，能捕捉微弱人聲。
+  - 數值越**高**：更嚴格，可過濾背景雜訊。
+- **asr.max_silence_seconds**: 語音切分門檻 (預設 `0.5`)。
+  - 講話停頓超過此秒數即判定句子結束並送出。
+  - 設太短會導致句子被切碎，設太長則字幕彈出較慢。
+- **asr.max_segment_seconds**: 單句最長秒數 (預設 `10.0`)。
+  - 達到此秒數時，即便尚未靜音也會強行分段，防止長句造成的辨識延遲。
 
 #### **字幕格式控制 (Subtitle)**
 - **subtitle.font_size**: 翻譯文字的字體大小 (原文會自動調整為稍小字體)。
