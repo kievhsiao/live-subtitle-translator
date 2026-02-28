@@ -79,7 +79,8 @@ class ASREngine:
                 str(local_model_dir),
                 dtype=torch.float16 if pt_device.startswith("cuda") else torch.float32,
                 device_map=pt_device,
-                local_files_only=True
+                local_files_only=True,
+                attn_implementation="sdpa"
             )
             self.ready = True
             print("PyTorch ASR model loaded successfully.")

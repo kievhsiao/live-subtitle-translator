@@ -124,21 +124,36 @@ class TranslatorApp:
             max_silence_chunks = int((self.config['asr'].get('max_silence_seconds', 0.5) * 16000) / 512)
             max_segment_chunks = int((self.config['asr'].get('max_segment_seconds', 10.0) * 16000) / 512)
             
-            chunk_data = self.capture.get_audio_chunk()
-            if chunk_data is None:
+            # --- 延遲優化：Queue Draining (佇列抽乾) ---
+            # 將目前卡在 Queue 裡面的所有聲音一次性拿出來
+            chunks = []
+            while True:
+                chunk_data = self.capture.get_audio_chunk()
+                if chunk_data is None:
+                    break
+                chunks.append(chunk_data)
+                
+            if not chunks:
                 await asyncio.sleep(0.01)
                 continue
+                
+            # 將所有細碎的 chunks 串接成一大段
+            combined_chunk_data = b"".join(chunks)
                 
             # 1. Convert to float32 mono at native rate
             native_rate = self.capture.actual_rate
             channels = self.capture.channels
             
-            audio_native = np.frombuffer(chunk_data, dtype=np.int16).astype(np.float32) / 32768.0
+            audio_native = np.frombuffer(combined_chunk_data, dtype=np.int16).astype(np.float32) / 32768.0
             if channels > 1:
                 audio_native = audio_native.reshape(-1, channels).mean(axis=1)
             
-            # 2. Resample to 16kHz
-            if native_rate != target_sr:
+            # 2. Resample to 16kHz (延遲優化：針對最常見的 48kHz 使用極速降頻)
+            if native_rate == 48000 and target_sr == 16000:
+                # O(1) 極速硬降頻：每 3 個取 1 個
+                audio_16k = audio_native[::3]
+            elif native_rate != target_sr:
+                # 退回使用 librosa，但因為是合併後的大塊，效能也比之前好很多
                 audio_16k = librosa.resample(audio_native, orig_sr=native_rate, target_sr=target_sr)
             else:
                 audio_16k = audio_native
@@ -187,22 +202,43 @@ class TranslatorApp:
                         
     async def transcribe_and_translate(self, audio):
         try:
+            import uuid
+            task_uid = str(uuid.uuid4())
+            
+            start_time = time.time()
+            audio_duration = len(audio) / 16000.0
+            print(f"\n--- [Task Start] Audio length: {audio_duration:.2f}s ---")
+            
             # 1. ASR - Pass language hint for better quality
             lang_hint = "Japanese" if self.config.get('source_language') == "ja" else None
             print("Transcribing...")
+            
+            asr_start = time.time()
             text = await asyncio.to_thread(self.asr.transcribe, audio, language=lang_hint)
+            asr_time = time.time() - asr_start
+            
             if not text:
                 print("ASR returned empty text.")
                 return
                 
-            print(f"ASR: {text}")
+            print(f"ASR [{asr_time:.2f}s]: {text}")
+            
+            # --- 延遲優化：漸進式渲染 (ASR 完成立刻上畫面) ---
+            # 讓翻譯欄位顯示 "翻譯中..." 或留白
+            self.overlay.text_updated_with_id.emit(text, "...", task_uid)
             
             # 2. Translate
+            trans_start = time.time()
             translated = await self.translator.translate(text, source_lang=self.config['source_language'])
-            print(f"TRN: {translated}")
+            trans_time = time.time() - trans_start
             
-            # 3. Update Overlay (Thread-safe via Signal)
-            self.overlay.text_updated.emit(text, translated)
+            print(f"TRN [{trans_time:.2f}s]: {translated}")
+            
+            # 3. Update Overlay (透過 UID 覆蓋翻譯內容)
+            self.overlay.text_updated_with_id.emit(None, translated, task_uid)
+            
+            total_time = time.time() - start_time
+            print(f"--- [Task End] Total latency: {total_time:.2f}s ---\n")
             
         except Exception as e:
             print(f"Processing error: {e}")

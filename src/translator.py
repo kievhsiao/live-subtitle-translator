@@ -12,7 +12,21 @@ class Translator:
         self.provider = provider.lower()
         self.api_key = api_key
         self.target_lang = target_lang
+        self._session = None
         self._init_provider()
+
+    async def get_session(self):
+        """Lazy load aiohttp session for connection pooling."""
+        if self._session is None or self._session.closed:
+            # 使用長駐連線池減少 HTTPS 握手延遲
+            connector = aiohttp.TCPConnector(limit_per_host=5, keepalive_timeout=60)
+            self._session = aiohttp.ClientSession(connector=connector)
+        return self._session
+
+    async def close_session(self):
+        """Clean up the session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     def _init_provider(self):
         if self.provider == "gemini":
@@ -88,11 +102,13 @@ class Translator:
                 "dt": "t",
                 "q": text
             }
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return "".join([sent[0] for sent in data[0]])
+            
+            # 使用連線池，不再每次重建 Session
+            session = await self.get_session()
+            async with session.get(url, params=params) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return "".join([sent[0] for sent in data[0]])
             return text
         except Exception as e:
             print(f"Google Free translation error: {e}")
