@@ -4,8 +4,10 @@ from pathlib import Path
 
 # Paths
 BASE_DIR = Path(__file__).parent
-MODEL_DIR = BASE_DIR / "ov_models"
-ASR_DIR = MODEL_DIR / "qwen3_asr_int8"
+MODEL_DIR_CPU = BASE_DIR / "models" / "cpu"
+MODEL_DIR_VAD = BASE_DIR / "models" / "vad"
+MODEL_DIR_COMMON = BASE_DIR / "models" / "common"
+ASR_DIR = MODEL_DIR_CPU / "qwen3_asr_int8"
 
 # URLs
 HF_BASE = "https://huggingface.co/dseditor/Qwen3-ASR-0.6B-INT8_ASYM-OpenVINO/resolve/main"
@@ -26,6 +28,8 @@ REQUIRED_FILES = [
     ("prompt_template.json", f"{HF_BASE}/prompt_template.json"),
 ]
 
+MEL_FILTER_URL = f"{HF_BASE}/mel_filters.npy"
+
 def download_file(url, dest):
     if dest.exists():
         print(f"Skipping {dest.name} (already exists)")
@@ -41,23 +45,76 @@ def download_file(url, dest):
     except Exception as e:
         print(f"Failed to download {dest.name}: {e}")
 
-def main():
-    print("=== Model Downloader ===")
-    
-    # Download VAD
-    vad_path = MODEL_DIR / "silero_vad_v4.onnx"
+def download_vad():
+    print("=== Downloading Shared VAD Model ===")
+    vad_path = MODEL_DIR_VAD / "silero_vad_v4.onnx"
     download_file(VAD_URL, vad_path)
+    
+def download_common():
+    print("=== Downloading Shared Common Files ===")
+    mel_path = MODEL_DIR_COMMON / "mel_filters.npy"
+    download_file(MEL_FILTER_URL, mel_path)
+    
+def download_cpu():
+    print("=== Downloading CPU Models (OpenVINO) ===")
     
     # Download ASR Files
     for filename, url in REQUIRED_FILES:
         dest = ASR_DIR / filename
         download_file(url, dest)
         
-    # Copy mel_filters.npy if it exists in parent or source
-    # (In QwenASRMiniTool it was generated or manually placed)
-    # We'll expect it to be handled or the user to copy it.
+    print("\n--- CPU Models verification finished ---")
+    print("If mel_filters.npy is missing, please copy it from QwenASRMiniTool.")
+
+def download_gpu():
+    print("\n=== Downloading GPU Models (PyTorch) ===")
+    try:
+        from huggingface_hub import snapshot_download
+        local_model_dir = Path("models/gpu/Qwen3-ASR-0.6B")
+        
+        if not local_model_dir.exists():
+            print("Downloading Qwen3-ASR-0.6B to local GPU directory (This may take a while)...")
+            local_model_dir.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_download(
+                repo_id="Qwen/Qwen3-ASR-0.6B",
+                local_dir=str(local_model_dir),
+                local_dir_use_symlinks=False,
+                resume_download=True
+            )
+            print(f"Finished downloading GPU model to {local_model_dir}")
+        else:
+            print(f"GPU Model already exists at {local_model_dir}, skipping download.")
+            
+    except ImportError:
+        print("huggingface_hub not installed. Skipping GPU model pre-download. (It will auto-download when running the app if needed)")
+    except Exception as e:
+        print(f"Failed to check/download GPU models: {e}")
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Download models for Live Subtitle Translator.")
+    parser.add_argument(
+        "--mode", 
+        type=str, 
+        choices=["cpu", "gpu", "all"], 
+        default="gpu",
+        help="Choose which models to download: 'cpu', 'gpu', or 'all'. Defaults to 'gpu'."
+    )
+    args = parser.parse_args()
     
-    print("\nDownload process finished. If mel_filters.npy is missing, please copy it from QwenASRMiniTool.")
+    print(f"=== Model Downloader (Mode: {args.mode.upper()}) ===")
+    
+    # VAD and Common files are shared across all modes
+    download_vad()
+    download_common()
+    
+    if args.mode in ["cpu", "all"]:
+        download_cpu()
+        
+    if args.mode in ["gpu", "all"]:
+        download_gpu()
+        
+    print("\nAll requested downloads finished.")
 
 if __name__ == "__main__":
     main()

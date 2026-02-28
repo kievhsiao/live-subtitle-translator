@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "accelerate>=1.12.0",
     "aiohttp>=3.13.3",
     "deepl>=1.28.0",
     "google-cloud-translate>=3.24.0",
@@ -17,10 +18,22 @@ dependencies = [
     "pyaudiowpatch>=0.2.12.8",
     "pyside6>=6.10.2",
     "pyyaml>=6.0.3",
+    "qwen-asr>=0.0.6",
     "requests>=2.32.5",
     "silero-vad>=6.2.1",
     "soundfile>=0.13.1",
     "tokenizers>=0.22.2",
-    "torch>=2.10.0",
-    "torchaudio>=2.10.0",
+    "torch",
+    "torchaudio",
+    "torchvision",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchaudio = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }

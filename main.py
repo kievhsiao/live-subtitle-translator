@@ -25,8 +25,12 @@ class TranslatorApp:
         self.app = QApplication(sys.argv)
         self.settings_window = SettingsWindow(config_path)
         self.overlay = SubtitleOverlay(
-            font_size=self.config['subtitle']['font_size'],
-            font_color=self.config['subtitle']['font_color']
+            font_size=self.config['subtitle'].get('font_size', 24),
+            font_color=self.config['subtitle'].get('font_color', '#FFFFFF'),
+            bg_opacity=self.config['subtitle'].get('bg_opacity', 0.4),
+            history_size=self.config['subtitle'].get('history_size', 3),
+            line_spacing=self.config['subtitle'].get('line_spacing', 15),
+            display_duration=self.config['subtitle'].get('display_duration', 10)
         )
         
         # Engines
@@ -43,7 +47,34 @@ class TranslatorApp:
         
         # Connections
         self.settings_window.start_btn.clicked.connect(self.start_system)
+        self.settings_window.settings_saved.connect(self.on_settings_saved)
         
+    def on_settings_saved(self, new_config):
+        """Handle real-time configuration updates."""
+        self.config = new_config
+        print("Applying new configuration to running engines...")
+        
+        # Update Translator
+        if hasattr(self, 'translator'):
+            self.translator.provider = self.config['translation_provider']
+            self.translator.api_key = self.config['api_keys'].get(self.config['translation_provider'])
+            self.translator.target_lang = self.config['target_language']
+            
+        # Update VAD
+        if hasattr(self, 'vad'):
+            self.vad.threshold = self.config['asr'].get('vad_threshold', 0.4)
+            
+        # Update Overlay
+        if hasattr(self, 'overlay'):
+            self.overlay.apply_settings(
+                font_size=self.config['subtitle'].get('font_size'),
+                font_color=self.config['subtitle'].get('font_color'),
+                bg_opacity=self.config['subtitle'].get('bg_opacity'),
+                history_size=self.config['subtitle'].get('history_size'),
+                line_spacing=self.config['subtitle'].get('line_spacing'),
+                display_duration=self.config['subtitle'].get('display_duration')
+            )
+            
     def start_system(self):
         if self.running:
             return
@@ -58,7 +89,7 @@ class TranslatorApp:
         try:
             # 1. Load ASR
             self.asr.load(
-                model_dir=self.config['asr']['model_dir'],
+                model_dir=self.config['asr'].get('model_dir'),
                 device=self.config['asr']['device']
             )
             
@@ -82,7 +113,6 @@ class TranslatorApp:
         
         speech_buffer = []
         silence_count = 0
-        max_silence = 25 # ~1.5s silence, better for continuous speech
         
         raw_buffer = [] # Buffer for incoming raw chunks
         processed_16k_buffer = np.array([], dtype=np.float32)
@@ -90,6 +120,10 @@ class TranslatorApp:
         target_sr = 16000
         
         while self.running:
+            # 動態重新計算分段參數 (允許執行中即時調整)
+            max_silence_chunks = int((self.config['asr'].get('max_silence_seconds', 0.5) * 16000) / 512)
+            max_segment_chunks = int((self.config['asr'].get('max_segment_seconds', 10.0) * 16000) / 512)
+            
             chunk_data = self.capture.get_audio_chunk()
             if chunk_data is None:
                 await asyncio.sleep(0.01)
@@ -124,6 +158,13 @@ class TranslatorApp:
                         print(f"\nSpeech started (prob: {prob:.2f})")
                     speech_buffer.append(vad_chunk)
                     silence_count = 0
+                    
+                    # 強制切分：如果說話太長（例如超過設定的 10 秒），就強行送出翻譯
+                    if len(speech_buffer) >= max_segment_chunks:
+                        segment = np.concatenate(speech_buffer)
+                        print(f"\n[Force Segment] segment too long, len: {len(segment)/16000:.2f}s")
+                        asyncio.create_task(self.transcribe_and_translate(segment))
+                        speech_buffer = [] # 清空 buffer，下一句重新開始
                 else:
                     if speech_buffer:
                         silence_count += 1
@@ -132,16 +173,17 @@ class TranslatorApp:
                         if silence_count % 5 == 0:
                             print("s", end="", flush=True)
                             
-                        # If silence long enough OR buffer too long
-                        if silence_count >= max_silence or len(speech_buffer) > 800:
+                        # 如果靜音超過設定時間 (例如 0.5s)，立刻送出
+                        if silence_count >= max_silence_chunks:
                             segment = np.concatenate(speech_buffer)
                             speech_buffer = []
                             silence_count = 0
                             
                             print(f"\nSegment detected, len: {len(segment)/16000:.2f}s")
-                            import soundfile as sf
-                            sf.write("debug_capture.wav", segment, 16000)
                             asyncio.create_task(self.transcribe_and_translate(segment))
+            
+            # Yield control explicitly so ASR tasks can start
+            await asyncio.sleep(0)
                         
     async def transcribe_and_translate(self, audio):
         try:

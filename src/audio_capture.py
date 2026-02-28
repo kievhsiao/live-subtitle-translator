@@ -82,7 +82,7 @@ class AudioCapture:
 
     def get_audio_chunk(self):
         try:
-            return self.audio_queue.get(timeout=0.1)
+            return self.audio_queue.get_nowait()
         except queue.Empty:
             return None
 

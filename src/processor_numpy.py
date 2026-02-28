@@ -55,12 +55,14 @@ def _load_mel_filters(model_dir: Path | None = None) -> np.ndarray:
     if _MEL_FILTERS is not None:
         return _MEL_FILTERS
 
-    # 搜尋 mel_filters.npy
     candidates: list[Path] = []
     if model_dir is not None:
-        candidates.append(model_dir.parent / "mel_filters.npy")  # ov_models/mel_filters.npy
         candidates.append(model_dir / "mel_filters.npy")
-    candidates.append(Path(__file__).parent / "ov_models" / "mel_filters.npy")
+        candidates.append(model_dir.parent / "mel_filters.npy")
+        candidates.append(model_dir.parent.parent / "common" / "mel_filters.npy") # models/common/mel_filters.npy
+
+    candidates.append(Path("mel_filters.npy"))
+    candidates.append(Path(__file__).parent / "models" / "common" / "mel_filters.npy")
 
     for p in candidates:
         if p.exists():
@@ -73,12 +75,15 @@ def _load_mel_filters(model_dir: Path | None = None) -> np.ndarray:
             else:
                 raise ValueError(f"mel_filters.npy shape {raw.shape} 不符預期")
             _MEL_FILTERS_PATH = p
+            print(f"Loaded mel_filters from: {p}")
             return _MEL_FILTERS
 
-    raise FileNotFoundError(
-        "找不到 ov_models/mel_filters.npy。\n"
-        "請先執行：python generate_prompt_template.py"
+    error_msg = (
+        f"找不到 models/common/mel_filters.npy。\n"
+        f"請先確保檔案已下載或放置於正確路徑。\n"
     )
+    print(f"Failed to load mel_filters: Could not find mel_filters.npy in any of the candidate paths.")
+    raise FileNotFoundError(error_msg)
 
 
 def _mel_filters(model_dir: Path | None = None) -> np.ndarray:

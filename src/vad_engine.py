@@ -10,7 +10,7 @@ class VADEngine:
         
         if model_path is None:
             # Look for model in default locations
-            model_path = os.path.join("ov_models", "silero_vad_v4.onnx")
+            model_path = os.path.join("models", "vad", "silero_vad_v4.onnx")
             
         if not os.path.exists(model_path):
             print(f"VAD model not found at {model_path}. Please ensure it exists.")

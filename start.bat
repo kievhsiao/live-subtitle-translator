@@ -1,4 +1,5 @@
 @echo off
 echo Starting Live Subtitle Translator...
-uv run python main.py
+call .venv\Scripts\activate.bat
+python main.py
 pause
