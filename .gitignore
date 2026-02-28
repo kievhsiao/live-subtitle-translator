@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Debug audio files
+debug_capture.wav
+generate_prompt_template.py
+test_asr.py
+
+#config
+config.yaml
+
+#implementation_plan
+implementation_plan.md.resolved
+tasks/
+
+#ov_models
+ov_models/

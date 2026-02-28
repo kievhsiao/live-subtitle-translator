@@ -1,0 +1,26 @@
+[project]
+name = "live-subtitle-translator"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.13.3",
+    "deepl>=1.28.0",
+    "google-cloud-translate>=3.24.0",
+    "google-genai>=1.65.0",
+    "librosa>=0.11.0",
+    "numpy>=2.4.2",
+    "onnxruntime>=1.24.2",
+    "opencc>=1.2.0",
+    "openvino>=2026.0.0",
+    "pyaudiowpatch>=0.2.12.8",
+    "pyside6>=6.10.2",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.5",
+    "silero-vad>=6.2.1",
+    "soundfile>=0.13.1",
+    "tokenizers>=0.22.2",
+    "torch>=2.10.0",
+    "torchaudio>=2.10.0",
+]
