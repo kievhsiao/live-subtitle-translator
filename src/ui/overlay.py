@@ -100,7 +100,11 @@ class SubtitleOverlay(QMainWindow):
                  f"border-radius: 5px; "
                  f"}}"
              )
-        if history_size is not None: self.history_size = history_size
+        if history_size is not None: 
+            self.history_size = history_size
+            # 若調整為更小的行數，需即時切除超過限制的舊紀錄
+            while len(self.history) > self.history_size:
+                self.history.pop(0)
         if line_spacing is not None: 
             self.line_spacing = line_spacing
             self.layout.setSpacing(self.line_spacing)

@@ -35,7 +35,8 @@ class Translator:
                 self.client = genai.Client(api_key=self.api_key)
         elif self.provider == "deepl":
             if self.api_key:
-                self.deepl_translator = deepl.Translator(self.api_key)
+                # 依據最新 DeepL 官方文件，使用 DeepLClient 取代 Translator
+                self.deepl_translator = deepl.DeepLClient(self.api_key)
         elif self.provider == "google":
             # Google Translate client usually expects GOOGLE_APPLICATION_CREDENTIALS
             # or it can be initialized with an API key for REST.
@@ -86,6 +87,14 @@ class Translator:
 
     async def _translate_deepl(self, text, source_lang):
         try:
+            # 防禦性檢查：確保 deepl_translator 已初始化
+            if not hasattr(self, 'deepl_translator') or self.deepl_translator is None:
+                self._init_provider()
+                
+            if not hasattr(self, 'deepl_translator') or self.deepl_translator is None:
+                print("DeepL translator not initialized. Check API Key.")
+                return text
+
             # Handle language code mapping for DeepL if needed (e.g., 'en' -> 'EN-US')
             target = self.target_lang.upper()
             if target == "ZH-TW": target = "ZH" # DeepL uses ZH for Chinese
