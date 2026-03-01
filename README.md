@@ -1,88 +1,88 @@
-# 即時翻譯字幕系統 (Live Subtitle Translator)
+# Live Subtitle Translator
 
-這是一個基於 Python 的即時語音辨識與翻譯工具，專為攔截電腦系統音訊 (Loopback) 並即時產生雙語字幕而設計。
+This is a Python-based real-time speech recognition and translation tool, designed to intercept computer system audio (Loopback) and generate bilingual subtitles on the fly.
 
-## 🌟 特色
+## 🌟 Features
 
-- **系統音擷取**：直接攔截揚聲器輸出，無需麥克風即可擷取影片、遊戲或直播音訊。
-- **雙引擎 ASR 辨識**：
-  - **CPU 模式 (OpenVINO)**：輕量、免安裝大顯卡，適合一般文書機。
-  - **CUDA 模式 (PyTorch)**：自動調用 NVIDIA 顯卡算力，極低延遲，並支援多顯卡切換。
-- **即時翻譯**：支援 Google (免費版/API)、DeepL 及 Gemini API 翻譯。
-- **透明 Overlay**：無邊框全透明字幕顯示，支援點擊穿透，不干擾操作。
-- **環境自動化**：使用 `uv` 管理環境，一鍵啟動。
+- **System Audio Capture**: Directly intercepts speaker output, allowing you to capture sound from videos, games, or live streams without needing a microphone.
+- **Dual-Engine ASR Recognition**:
+  - **CPU Mode (OpenVINO)**: Lightweight, does not require a dedicated GPU, suitable for standard desktop/laptop computers.
+  - **CUDA Mode (PyTorch)**: Automatically utilizes NVIDIA GPU computing power for ultra-low latency, and supports switching between multiple graphics cards.
+- **Real-time Translation**: Supports Google (Free/API), DeepL, and Gemini API translation.
+- **Transparent Overlay**: Frameless, fully transparent subtitle display with click-through support, ensuring it doesn't interfere with your operations.
+- **Environment Automation**: Uses `uv` for environment management, enabling one-click startup.
 
-## 🛠️ 快速開始
+## 🛠️ Quick Start
 
-### 1. 環境準備
-請確保您的電腦已安裝 [uv](https://github.com/astral-sh/uv)。
+### 1. Prerequisites
+Ensure your computer has [uv](https://github.com/astral-sh/uv) installed.
 
-### 2. 環境安裝 (包含 NVIDIA CUDA 支援)
-如果您是第一次使用，或剛刪除了 `.venv` 環境，請執行以下步驟：
+### 2. Environment Setup (including NVIDIA CUDA support)
+If you are using this for the first time, or just deleted the `.venv` environment, please execute the following steps:
 
 ```powershell
 uv venv
 .venv\Scripts\activate
 uv pip install -r requirements.txt
 ```
-*(我們特別於 requirements.txt 內指明了 PyTorch CUDA 12.4 下載位置，以確保支援 GPU 雙引擎。)*
+*(We have specifically designated the PyTorch CUDA 12.4 download location in `requirements.txt` to ensure GPU dual-engine support.)*
 
-### 3. 下載模型權重
-第一次執行前，強烈建議您按兩下執行 `setup_models.bat` 來預先下載所需的模型檔案。
-執行時會跳出互動式選單，您可以自由選擇：
-- **[1] 預設推薦：下載 GPU 模型 (PyTorch)**（約 2.3 GB），供 NVIDIA 顯卡使用。
-- **[2] 下載 CPU 模型 (OpenVINO)**（約 1.2 GB），供 Intel/一般 CPU 使用。
-- **[3] 兩者皆下載**。
+### 3. Download Model Weights
+Before running for the first time, it is highly recommended to double-click and execute `setup_models.bat` to pre-download the required model files.
+An interactive menu will pop up during execution, allowing you to choose freely:
+- **[1] Default Recommendation: Download GPU Model (PyTorch)** (approx. 2.3 GB), for NVIDIA graphics cards.
+- **[2] Download CPU Model (OpenVINO)** (approx. 1.2 GB), for Intel/general CPU usage.
+- **[3] Download Both**.
 
-*(若您跳過此步，GPU 模式會在您第一次啟動主程式時卡在命令列進行背景下載。)*
+*(If you skip this step, the GPU mode will get stuck downloading in the background via the command line the first time you start the main program.)*
 
 
-### 4. 系統與顯卡配置 (config.yaml)
-在啟動程式前或執行時，您可以開啟並編輯專案根目錄下的 `config.yaml` 來自訂行為：
+### 4. System and Configuration (`config.yaml`)
+Before or during runtime, you can open and edit the `config.yaml` file in the project root directory to customize behaviors:
 
-#### **ASR 推理與分段控制**
-- **asr.device**: 切換推理引擎
-  - `CPU`: 使用 OpenVINO 模式。
-  - `CUDA`: 使用 NVIDIA GPU PyTorch 模式。
-  - `CUDA:X`: (例如: `CUDA:0`) 指定特定的 NVIDIA 顯卡。
-- **asr.vad_threshold**: 人聲偵測靈敏度 (預設 `0.3`)。
-  - 數值越**低**：更敏銳，能捕捉微弱人聲。
-  - 數值越**高**：更嚴格，可過濾背景雜訊。
-- **asr.max_silence_seconds**: 語音切分門檻 (預設 `0.5`)。
-  - 講話停頓超過此秒數即判定句子結束並送出。
-  - 設太短會導致句子被切碎，設太長則字幕彈出較慢。
-- **asr.max_segment_seconds**: 單句最長秒數 (預設 `10.0`)。
-  - 達到此秒數時，即便尚未靜音也會強行分段，防止長句造成的辨識延遲。
+#### **ASR Inference and Segmentation Control**
+- **asr.device**: Switch the inference engine
+  - `CPU`: Use OpenVINO mode.
+  - `CUDA`: Use NVIDIA GPU PyTorch mode.
+  - `CUDA:X`: (e.g., `CUDA:0`) Specify a particular NVIDIA graphics card.
+- **asr.vad_threshold**: Voice detection sensitivity (default `0.3`).
+  - **Lower value**: More sensitive, can capture faint human voices.
+  - **Higher value**: Stricter, filters out background noise.
+- **asr.max_silence_seconds**: Speech segmentation threshold (default `0.5`).
+  - If speech pauses exceed this number of seconds, the sentence is considered finished and sent for translation.
+  - Setting it too short will cause sentences to be chopped up; setting it too long will slow down subtitle popup.
+- **asr.max_segment_seconds**: Maximum seconds per single sentence (default `10.0`).
+  - When this duration is reached, it will forcefully segment the speech even if there is no silence, preventing recognition lag caused by overly long sentences.
 
-#### **字幕格式控制 (Subtitle)**
-- **subtitle.font_size**: 翻譯文字的字體大小 (原文會自動調整為稍小字體)。
-- **subtitle.history_size**: 同時顯示的字幕行數 (預設 `3`)，新字幕會推擠舊字幕。
-- **subtitle.line_spacing**: 每組雙語字幕之間的垂直間距。
-- **subtitle.display_duration**: 字幕在無語音更新後，持續顯示的秒數 (預設 `10`)。
-- **subtitle.bg_opacity**: 背景半透明黑框的透明度 (`0.0`~`1.0`)。
+#### **Subtitle Format Control (Subtitle)**
+- **subtitle.font_size**: Font size of the translated text (the original text will automatically adjust to a slightly smaller size).
+- **subtitle.history_size**: Number of subtitle lines displayed simultaneously (default `3`), new subtitles will push up older ones.
+- **subtitle.line_spacing**: Vertical spacing between each set of bilingual subtitles.
+- **subtitle.display_duration**: Number of seconds the subtitle remains displayed after no voice updates (default `10`).
+- **subtitle.bg_opacity**: Transparency of the background semi-transparent black overlay (`0.0`~`1.0`).
 
-#### **其他核心設定**
-- **source_language**: 來源語音 (預設為 `ja` 日文)
-- **translation_provider**: 翻譯供應商 (預設為 `google_free`)
-- **target_language**: 目標語言 (預設為 `zh-TW`)
+#### **Other Core Settings**
+- **source_language**: Source audio language (default `ja` for Japanese).
+- **translation_provider**: Translation service provider (default `google_free`).
+- **target_language**: Target translation language (default `zh-TW`).
 
-*(您也可以直接透過 GUI 視窗更改翻譯供應商與語系)*
+*(You can also directly change the translation provider and language through the GUI window)*
 
-### 5. 啟動系統
-連按兩下 `start.bat` 或執行：
+### 5. Start the System
+Double-click `start.bat` or run:
 ```powershell
 ./start.bat
 ```
 
-## 📂 專案結構
-- `main.py`: 系統進入點。
-- `src/`: 核心邏輯模組 (音訊、ASR、翻譯、UI)。
-- `config.yaml`: 系統持久化設定。
-- `download_models.py`: 模型下載公用程式。
+## 📂 Project Structure
+- `main.py`: System entry point.
+- `src/`: Core logic modules (audio, ASR, translation, UI).
+- `config.yaml`: System persistence settings.
+- `download_models.py`: Model download utility.
 
-## ⚠️ 注意事項
-- **首次執行**：下載模型需要一定時間，請保持網路暢通。
-- **缺少 CPU 模型**：若執行 ASR 報錯，請確認 `models/cpu/qwen3_asr_int8` 目錄與 `mel_filters.npy` 檔案完整。
+## ⚠️ Notes
+- **First-time Execution**: Downloading models takes some time, please ensure a stable internet connection.
+- **Missing CPU Model**: If launching ASR throws an error, please ensure the `models/cpu/qwen3_asr_int8` directory and `models/common/mel_filters.npy` file are complete.
 
 ---
 Developed with ❤️ for real-time accessibility.

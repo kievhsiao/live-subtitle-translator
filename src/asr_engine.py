@@ -1,8 +1,12 @@
+import os
 import numpy as np
 import openvino as ov
 import threading
-import os
 from pathlib import Path
+
+# Suppress Hugging Face transformers 'temperature' warning (GenerationConfig issue)
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+
 from src.processor_numpy import LightProcessor
 
 class ASREngine:

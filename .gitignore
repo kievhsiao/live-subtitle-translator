@@ -9,16 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
-# Debug audio files
-debug_capture.wav
-generate_prompt_template.py
-test_asr.py
-
 #config
 config.yaml
 
-#implementation_plan
-implementation_plan.md.resolved
+#tasks
 tasks/
 
 #models

@@ -77,7 +77,8 @@ class Translator:
                 model='gemini-2.5-flash-lite', # 官方 2025 低延遲首選模型
                 contents=text,
                 config=types.GenerateContentConfig(
-                    system_instruction=system_instr
+                    system_instruction=system_instr,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
                 )
             )
             return response.text.strip()
