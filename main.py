@@ -100,7 +100,6 @@ class TranslatorApp:
         """Update cached parameters for the high-frequency process loop."""
         self._max_silence_chunks = int((self.config['asr'].get('max_silence_seconds', 0.5) * 16000) / 512)
         self._max_segment_chunks = int((self.config['asr'].get('max_segment_seconds', 10.0) * 16000) / 512)
-        self._partial_interval = self.config['asr'].get('partial_interval', 0.8)
 
     def _initialize_and_run(self):
         try:
@@ -131,8 +130,6 @@ class TranslatorApp:
         speech_buffer = []
         silence_count = 0
         current_uid = None
-        last_partial_time = 0
-        self.is_partial_running = False
         
         raw_buffer = [] # Buffer for incoming raw chunks
         processed_16k_buffer = np.array([], dtype=np.float32)
@@ -181,32 +178,23 @@ class TranslatorApp:
             while len(processed_16k_buffer) >= 512:
                 vad_chunk = processed_16k_buffer[:512]
                 processed_16k_buffer = processed_16k_buffer[512:]
-                
                 is_speech, prob = self.vad.is_speech(vad_chunk)
                 
                 if is_speech:
                     if not speech_buffer:
                         import uuid
                         current_uid = str(uuid.uuid4())
-                        last_partial_time = time.time()
                         print(f"\nSpeech started (prob: {prob:.2f})")
                     speech_buffer.append(vad_chunk)
                     silence_count = 0
-                    
-                    # 漸進式 UI 更新 (背景發送給 ASR 預辨識)
-                    if time.time() - last_partial_time > self._partial_interval and not self.is_partial_running:
-                        segment = np.concatenate(speech_buffer)
-                        self.is_partial_running = True
-                        asyncio.create_task(self.partial_transcribe(segment, current_uid))
-                        last_partial_time = time.time()
                 else:
                     if speech_buffer:
                         silence_count += 1
-                        speech_buffer.append(vad_chunk)
-                        if silence_count % 5 == 0:
-                            print("s", end="", flush=True)
+                        # 只保留一部分 tail silence，避免無意義的靜音被送去辨識
+                        if silence_count <= self._max_silence_chunks:
+                            speech_buffer.append(vad_chunk)
 
-                # 重複邏輯合併：判斷是否達到強制出字條件 (句子太長 OR 到達靜音閥值)
+                # 判斷是否達到強制出字條件 (句子太長 OR 到達靜音閥值)
                 force_segment = len(speech_buffer) >= self._max_segment_chunks
                 silence_segment = silence_count >= self._max_silence_chunks
                 
@@ -227,18 +215,6 @@ class TranslatorApp:
             # Yield control explicitly so ASR tasks can start
             await asyncio.sleep(0)
                         
-    async def partial_transcribe(self, audio, task_uid):
-        try:
-            lang_hint = "Japanese" if self.config.get('source_language') == "ja" else None
-            text = await asyncio.to_thread(self.asr.transcribe, audio, language=lang_hint)
-            if text:
-                # 僅顯示預期，不翻譯
-                self.overlay.text_updated_with_id.emit(text + "...", "...", task_uid)
-        except Exception as e:
-            print(f"Partial ASR error: {e}")
-        finally:
-            self.is_partial_running = False
-
     async def transcribe_and_translate(self, audio, task_uid=None):
         try:
             import uuid

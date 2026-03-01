@@ -58,10 +58,16 @@ class SubtitleOverlay(QMainWindow):
         self.sizegrip.setStyleSheet("background: transparent;")
         self.sizegrip.setFixedSize(20, 20)
         
-        # Initial position
+        # Initial position (初始化視窗位置與大小)
         screen = QApplication.primaryScreen().geometry()
-        w = int(screen.width() * 0.85)
-        h = int(screen.height() * 0.3)
+        
+        # === 字幕視窗起始寬度與高度設定位置 ===
+        # 寬度預設為螢幕寬度的 50%
+        w = int(screen.width() * 0.50)
+        # 高度預設為螢幕高度的 15%
+        h = int(screen.height() * 0.15)
+        # =======================================
+        
         self.resize(w, h)
         self.setMinimumSize(400, 100) # 寬度可以更小一點點
         self.move((screen.width() - w) // 2, screen.height() - h - 100)
