@@ -17,7 +17,7 @@ class SettingsWindow(QMainWindow):
         self._load_config()
         
         self.setWindowTitle("即時翻譯字幕系統 - 設定")
-        self.resize(550, 750) # 增大容量
+        self.resize(350, 750) # 增大容量
         
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -49,6 +49,7 @@ class SettingsWindow(QMainWindow):
         self.config['asr']['vad_threshold'] = self.vad_threshold.value()
         self.config['asr']['max_silence_seconds'] = self.max_silence.value()
         self.config['asr']['max_segment_seconds'] = self.max_segment.value()
+        self.config['asr']['partial_interval'] = self.partial_interval.value()
         
         # Update Subtitle
         self.config['subtitle']['font_size'] = self.font_size.value()
@@ -124,10 +125,16 @@ class SettingsWindow(QMainWindow):
         self.max_segment.setRange(1.0, 30.0)
         self.max_segment.setValue(self.config.get('asr', {}).get('max_segment_seconds', 10.0))
         
+        self.partial_interval = QDoubleSpinBox()
+        self.partial_interval.setRange(0.2, 5.0)
+        self.partial_interval.setSingleStep(0.2)
+        self.partial_interval.setValue(self.config.get('asr', {}).get('partial_interval', 0.8))
+        
         asr_form.addRow("推論裝置 (Device):", self.device_combo)
-        asr_form.addRow("VAD 靈敏度 (低則易切):", self.vad_threshold)
+        asr_form.addRow("VAD 靈敏度:", self.vad_threshold)
         asr_form.addRow("靜音切分秒數:", self.max_silence)
         asr_form.addRow("最長強制切分秒數:", self.max_segment)
+        asr_form.addRow("漸進式預辨識間隔 (秒):", self.partial_interval)
         
         self.layout.addWidget(asr_group)
         

@@ -57,6 +57,7 @@ class TranslatorApp:
     def on_settings_saved(self, new_config):
         """Handle real-time configuration updates."""
         self.config = new_config
+        self.update_loop_params()
         print("Applying new configuration to running engines...")
         
         # Update Translator
@@ -90,8 +91,16 @@ class TranslatorApp:
         self.settings_window.start_btn.setEnabled(False)
         self.settings_window.start_btn.setText("正在啟動 ASR...")
         
+        self.update_loop_params()
+        
         # Run ASR loading in a thread to keep UI responsive
         threading.Thread(target=self._initialize_and_run, daemon=True).start()
+
+    def update_loop_params(self):
+        """Update cached parameters for the high-frequency process loop."""
+        self._max_silence_chunks = int((self.config['asr'].get('max_silence_seconds', 0.5) * 16000) / 512)
+        self._max_segment_chunks = int((self.config['asr'].get('max_segment_seconds', 10.0) * 16000) / 512)
+        self._partial_interval = self.config['asr'].get('partial_interval', 0.8)
 
     def _initialize_and_run(self):
         try:
@@ -121,6 +130,9 @@ class TranslatorApp:
         
         speech_buffer = []
         silence_count = 0
+        current_uid = None
+        last_partial_time = 0
+        self.is_partial_running = False
         
         raw_buffer = [] # Buffer for incoming raw chunks
         processed_16k_buffer = np.array([], dtype=np.float32)
@@ -128,10 +140,6 @@ class TranslatorApp:
         target_sr = 16000
         
         while self.running:
-            # 動態重新計算分段參數 (允許執行中即時調整)
-            max_silence_chunks = int((self.config['asr'].get('max_silence_seconds', 0.5) * 16000) / 512)
-            max_segment_chunks = int((self.config['asr'].get('max_segment_seconds', 10.0) * 16000) / 512)
-            
             # --- 延遲優化：Queue Draining (佇列抽乾) ---
             # 將目前卡在 Queue 裡面的所有聲音一次性拿出來
             chunks = []
@@ -178,40 +186,63 @@ class TranslatorApp:
                 
                 if is_speech:
                     if not speech_buffer:
+                        import uuid
+                        current_uid = str(uuid.uuid4())
+                        last_partial_time = time.time()
                         print(f"\nSpeech started (prob: {prob:.2f})")
                     speech_buffer.append(vad_chunk)
                     silence_count = 0
                     
-                    # 強制切分：如果說話太長（例如超過設定的 10 秒），就強行送出翻譯
-                    if len(speech_buffer) >= max_segment_chunks:
+                    # 漸進式 UI 更新 (背景發送給 ASR 預辨識)
+                    if time.time() - last_partial_time > self._partial_interval and not self.is_partial_running:
                         segment = np.concatenate(speech_buffer)
-                        print(f"\n[Force Segment] segment too long, len: {len(segment)/16000:.2f}s")
-                        asyncio.create_task(self.transcribe_and_translate(segment))
-                        speech_buffer = [] # 清空 buffer，下一句重新開始
+                        self.is_partial_running = True
+                        asyncio.create_task(self.partial_transcribe(segment, current_uid))
+                        last_partial_time = time.time()
                 else:
                     if speech_buffer:
                         silence_count += 1
                         speech_buffer.append(vad_chunk)
-                        
                         if silence_count % 5 == 0:
                             print("s", end="", flush=True)
-                            
-                        # 如果靜音超過設定時間 (例如 0.5s)，立刻送出
-                        if silence_count >= max_silence_chunks:
-                            segment = np.concatenate(speech_buffer)
-                            speech_buffer = []
-                            silence_count = 0
-                            
-                            print(f"\nSegment detected, len: {len(segment)/16000:.2f}s")
-                            asyncio.create_task(self.transcribe_and_translate(segment))
+
+                # 重複邏輯合併：判斷是否達到強制出字條件 (句子太長 OR 到達靜音閥值)
+                force_segment = len(speech_buffer) >= self._max_segment_chunks
+                silence_segment = silence_count >= self._max_silence_chunks
+                
+                if speech_buffer and (force_segment or silence_segment):
+                    segment = np.concatenate(speech_buffer)
+                    if force_segment:
+                        print(f"\n[Force Segment] segment too long, len: {len(segment)/16000:.2f}s")
+                    else:
+                        print(f"\nSegment detected, len: {len(segment)/16000:.2f}s")
+                        
+                    asyncio.create_task(self.transcribe_and_translate(segment, current_uid))
+                    
+                    # 狀態重置
+                    speech_buffer = []
+                    silence_count = 0
+                    current_uid = None
             
             # Yield control explicitly so ASR tasks can start
             await asyncio.sleep(0)
                         
-    async def transcribe_and_translate(self, audio):
+    async def partial_transcribe(self, audio, task_uid):
+        try:
+            lang_hint = "Japanese" if self.config.get('source_language') == "ja" else None
+            text = await asyncio.to_thread(self.asr.transcribe, audio, language=lang_hint)
+            if text:
+                # 僅顯示預期，不翻譯
+                self.overlay.text_updated_with_id.emit(text + "...", "...", task_uid)
+        except Exception as e:
+            print(f"Partial ASR error: {e}")
+        finally:
+            self.is_partial_running = False
+
+    async def transcribe_and_translate(self, audio, task_uid=None):
         try:
             import uuid
-            task_uid = str(uuid.uuid4())
+            task_uid = task_uid or str(uuid.uuid4())
             
             start_time = time.time()
             audio_duration = len(audio) / 16000.0
