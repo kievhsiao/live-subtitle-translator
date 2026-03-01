@@ -80,9 +80,17 @@ Double-click `start.bat` or run:
 - `config.yaml`: System persistence settings.
 - `download_models.py`: Model download utility.
 
-## ⚠️ Notes
-- **First-time Execution**: Downloading models takes some time, please ensure a stable internet connection.
-- **Missing CPU Model**: If launching ASR throws an error, please ensure the `models/cpu/qwen3_asr_int8` directory and `models/common/mel_filters.npy` file are complete.
+## 📜 Credits & Acknowledgments
+
+This project is built upon the following amazing open-source projects and services:
+
+- **ASR Model**: [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by Alibaba Qwen Team.
+- **VAD Model**: [Silero VAD](https://github.com/snakers4/silero-vad) by Silero.
+- **Inference Engines**: [OpenVINO™ toolkit](https://github.com/openvinotoolkit/openvino) (Intel) and [PyTorch](https://pytorch.org/).
+- **Translation Services**: Google Translate, [DeepL](https://www.deepl.com/), and [Google Gemini](https://ai.google.dev/).
+- **GUI Framework**: [PySide6](https://pypi.org/project/PySide6/) (Qt for Python).
+- **Package Management**: [uv](https://github.com/astral-sh/uv) by Astral.
 
 ---
+
 Developed with ❤️ for real-time accessibility.

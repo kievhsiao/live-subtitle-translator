@@ -80,9 +80,17 @@ uv pip install -r requirements.txt
 - `config.yaml`: 系統持久化設定。
 - `download_models.py`: 模型下載公用程式。
 
-## ⚠️ 注意事項
-- **首次執行**：下載模型需要一定時間，請保持網路暢通。
-- **缺少 CPU 模型**：若執行 ASR 報錯，請確認 `models/cpu/qwen3_asr_int8` 目錄與 `mel_filters.npy` 檔案完整。
+## 📜 技術引用與致謝
+
+本專案受益於以下優秀的開源專案與服務：
+
+- **ASR 模型**: [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) (Alibaba Qwen Team)。
+- **VAD 模型**: [Silero VAD](https://github.com/snakers4/silero-vad) (Silero)。
+- **推論引擎**: [OpenVINO™ toolkit](https://github.com/openvinotoolkit/openvino) (Intel) 與 [PyTorch](https://pytorch.org/)。
+- **翻譯服務**: Google Translate, [DeepL](https://www.deepl.com/), 與 [Google Gemini](https://ai.google.dev/)。
+- **GUI 框架**: [PySide6](https://pypi.org/project/PySide6/) (Qt for Python)。
+- **環境與包管理**: [uv](https://github.com/astral-sh/uv) (Astral)。
 
 ---
+
 Developed with ❤️ for real-time accessibility.
