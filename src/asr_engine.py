@@ -1,7 +1,22 @@
 import os
+import sys
+import sysconfig
 import numpy as np
 import threading
 from pathlib import Path
+
+# ── Windows CUDA DLL 預先登錄 ─────────────────────────────────────────────
+# ctranslate2 的原生 .pyd 在 import 時就會解析 cublas64_12.dll 等 DLL 的載入路徑。
+# nvidia-cublas-cu12 等套件把 DLL 裝在 site-packages/nvidia/*/bin/，
+# 需要在任何 ctranslate2 / faster_whisper import 之前呼叫 add_dll_directory 登錄。
+if sys.platform == "win32":
+    _nvidia_dir = os.path.join(sysconfig.get_path("purelib"), "nvidia")
+    if os.path.isdir(_nvidia_dir):
+        for _pkg in os.listdir(_nvidia_dir):
+            _bin = os.path.join(_nvidia_dir, _pkg, "bin")
+            if os.path.isdir(_bin):
+                os.add_dll_directory(_bin)
+
 
 # Suppress Hugging Face transformers 'temperature' warning (GenerationConfig issue)
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
@@ -52,9 +67,33 @@ class ASREngine:
         else:
             self._load_faster_whisper(device, target_dir)
 
+    @staticmethod
+    def _add_nvidia_dll_dirs():
+        """
+        Windows: 讓 ctranslate2 能找到 nvidia-cublas-cu12 等套件提供的 DLL。
+        這些 DLL 被安裝在 site-packages/nvidia/*/bin/ 下，需要手動以
+        os.add_dll_directory() 登錄，否則 ctranslate2 的 C++ 程式庫無法載入。
+        """
+        import os, sys, sysconfig
+        if sys.platform != "win32":
+            return
+        site_packages = sysconfig.get_path("purelib")
+        nvidia_dir = os.path.join(site_packages, "nvidia")
+        if not os.path.isdir(nvidia_dir):
+            return
+        for pkg in os.listdir(nvidia_dir):
+            bin_dir = os.path.join(nvidia_dir, pkg, "bin")
+            if os.path.isdir(bin_dir):
+                os.add_dll_directory(bin_dir)
+                print(f"[DLL] Added: {bin_dir}")
+
     def _load_faster_whisper(self, requested_device: str, local_model_dir_str: str):
+
         local_model_dir = Path(local_model_dir_str)
         print(f"Loading faster-whisper ASR model from ({local_model_dir})...")
+
+        # Windows: 先登錄 nvidia-*-cu12 套件的 DLL 目錄，讓 ctranslate2 能找到 cublas64_12.dll 等
+        self._add_nvidia_dll_dirs()
 
         from faster_whisper import WhisperModel
 
@@ -78,7 +117,7 @@ class ASREngine:
                 model_path,
                 device="cuda",
                 device_index=gpu_index,
-                compute_type="float16",
+                compute_type="int8_float16",  # float16 requires cublas64_12.dll; int8_float16 uses cuDNN (already available)
                 local_files_only=local_model_dir.exists(),
             )
             self.ready = True
@@ -131,7 +170,9 @@ class ASREngine:
                 return self._transcribe_faster_whisper(audio, language)
 
     def _transcribe_faster_whisper(self, audio: np.ndarray, language: str | None) -> str:
+        import traceback
         try:
+            print(f"[FW] audio shape={audio.shape}, dtype={audio.dtype}, lang={language}")
             segments, info = self.fw_model.transcribe(
                 audio,
                 language=language,      # ISO 639-1: "ja", "en", etc.
@@ -139,10 +180,15 @@ class ASREngine:
                 vad_filter=False,       # 我們已有自己的 VAD pipeline
                 condition_on_previous_text=False,
             )
-            text = " ".join(seg.text for seg in segments).strip()
+            print(f"[FW] detected language: {info.language} (prob={info.language_probability:.2f})")
+            seg_list = list(segments)  # 強制消費 generator
+            print(f"[FW] segments count: {len(seg_list)}")
+            text = " ".join(seg.text for seg in seg_list).strip()
+            print(f"[FW] raw text: {repr(text)}")
             return text
         except Exception as e:
             print(f"faster-whisper transcription error: {e}")
+            traceback.print_exc()
             return ""
 
     def _transcribe_openvino(self, audio: np.ndarray, max_tokens: int, language: str | None, context: str | None) -> str:

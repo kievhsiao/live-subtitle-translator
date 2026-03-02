@@ -90,30 +90,80 @@ def download_gpu():
     except Exception as e:
         print(f"Failed to check/download GPU models: {e}")
 
+def fix_windows_cuda_dlls():
+    """
+    Windows: 將 nvidia-*-cu12 套件的 CUDA DLL 複製到 ctranslate2 目錄。
+    ctranslate2 的原生 .pyd 在載入時會在自己的目錄尋找 cublas64_12.dll 等，
+    但 nvidia-cublas-cu12 套件把 DLL 放在 site-packages/nvidia/*/bin/ 下。
+    複製後就能被 ctranslate2 正確載入（不需修改 PATH）。
+    uv sync 後若 ctranslate2 被重新安裝，需再執行一次此函式。
+    """
+    import sys
+    import sysconfig
+    import shutil
+
+    if sys.platform != "win32":
+        print("DLL fix only needed on Windows, skipping.")
+        return
+
+    site = sysconfig.get_path("purelib")
+    nvidia_dir = Path(site) / "nvidia"
+    ct2_dir = Path(site) / "ctranslate2"
+
+    if not nvidia_dir.is_dir():
+        print("nvidia packages not found, skipping DLL fix.")
+        return
+    if not ct2_dir.is_dir():
+        print("ctranslate2 package not found, skipping DLL fix.")
+        return
+
+    print("=== Copying CUDA DLLs into ctranslate2 directory ===")
+    copied = 0
+    for pkg in nvidia_dir.iterdir():
+        bin_dir = pkg / "bin"
+        if not bin_dir.is_dir():
+            continue
+        for dll in bin_dir.glob("*.dll"):
+            dest = ct2_dir / dll.name
+            shutil.copy2(str(dll), str(dest))
+            print(f"  Copied: {dll.name}")
+            copied += 1
+    print(f"Done. {copied} DLL(s) copied to {ct2_dir}")
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Download models for Live Subtitle Translator.")
     parser.add_argument(
-        "--mode", 
-        type=str, 
-        choices=["cpu", "gpu", "all"], 
+        "--mode",
+        type=str,
+        choices=["cpu", "gpu", "all"],
         default="gpu",
         help="Choose which models to download: 'cpu', 'gpu', or 'all'. Defaults to 'gpu'."
     )
+    parser.add_argument(
+        "--fix-dlls",
+        action="store_true",
+        help="(Windows only) Copy CUDA DLLs from nvidia-*-cu12 packages into ctranslate2 directory."
+    )
     args = parser.parse_args()
-    
+
+    if args.fix_dlls:
+        fix_windows_cuda_dlls()
+        return
+
     print(f"=== Model Downloader (Mode: {args.mode.upper()}) ===")
-    
+
     # VAD and Common files are shared across all modes
     download_vad()
     download_common()
-    
+
     if args.mode in ["cpu", "all"]:
         download_cpu()
-        
+
     if args.mode in ["gpu", "all"]:
         download_gpu()
-        
+
     print("\nAll requested downloads finished.")
 
 if __name__ == "__main__":

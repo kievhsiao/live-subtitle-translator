@@ -30,6 +30,16 @@ echo Starting download in %MODE% mode...
 call .venv\Scripts\activate.bat
 python download_models.py --mode %MODE%
 
+if "%MODE%"=="gpu" (
+    echo.
+    echo Fixing Windows CUDA DLLs for ctranslate2...
+    python download_models.py --fix-dlls
+) else if "%MODE%"=="all" (
+    echo.
+    echo Fixing Windows CUDA DLLs for ctranslate2...
+    python download_models.py --fix-dlls
+)
+
 echo.
 echo Finished. You can now run start.bat
 pause
