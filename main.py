@@ -36,11 +36,7 @@ class TranslatorApp:
         # Engines
         self.vad = VADEngine(threshold=self.config['asr']['vad_threshold'])
         
-        # 智慧判斷是否需要預載 GPU 資源
-        asr_device = self.config['asr'].get('device', 'CPU').upper()
-        use_gpu_preload = asr_device == 'GPU' or asr_device.startswith('CUDA')
-        
-        self.asr = ASREngine(use_gpu_preload=use_gpu_preload)
+        self.asr = ASREngine()
         self.translator = Translator(
             provider=self.config['translation_provider'],
             api_key=self.config['api_keys'].get(self.config['translation_provider']),
@@ -233,8 +229,8 @@ class TranslatorApp:
             audio_duration = len(audio) / 16000.0
             print(f"\n--- [Task Start] Audio length: {audio_duration:.2f}s ---")
             
-            # 1. ASR - Pass language hint for better quality
-            lang_hint = "Japanese" if self.config.get('source_language') == "ja" else None
+            # 1. ASR - Pass ISO 639-1 language code for better quality
+            lang_hint = self.config.get('source_language')  # "ja", "en", etc.
             print("Transcribing...")
             
             asr_start = time.time()

@@ -5,7 +5,7 @@ echo             Model Downloader
 echo =========================================
 echo.
 echo Please select which models to download:
-echo [1] GPU Model Only (Recommended, ~2.3GB)
+echo [1] GPU Model Only (Recommended, ~3GB)
 echo [2] CPU Model Only (OpenVINO, ~1.2GB)
 echo [3] Download Both Models
 echo.
@@ -29,6 +29,16 @@ echo.
 echo Starting download in %MODE% mode...
 call .venv\Scripts\activate.bat
 python download_models.py --mode %MODE%
+
+if "%MODE%"=="gpu" (
+    echo.
+    echo Fixing Windows CUDA DLLs for ctranslate2...
+    python download_models.py --fix-dlls
+) else if "%MODE%"=="all" (
+    echo.
+    echo Fixing Windows CUDA DLLs for ctranslate2...
+    python download_models.py --fix-dlls
+)
 
 echo.
 echo Finished. You can now run start.bat

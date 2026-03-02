@@ -7,7 +7,7 @@ This is a Python-based real-time speech recognition and translation tool, design
 - **System Audio Capture**: Directly intercepts speaker output, allowing you to capture sound from videos, games, or live streams without needing a microphone.
 - **Dual-Engine ASR Recognition**:
   - **CPU Mode (OpenVINO)**: Lightweight, does not require a dedicated GPU, suitable for standard desktop/laptop computers.
-  - **CUDA Mode (PyTorch)**: Automatically utilizes NVIDIA GPU computing power for ultra-low latency, and supports switching between multiple graphics cards.
+  - **CUDA Mode (faster-whisper / CTranslate2)**: Automatically utilizes NVIDIA GPU computing power for ultra-low latency, and supports switching between multiple graphics cards.
 - **Real-time Translation**: Supports Google (Free/API), DeepL, and Gemini API translation.
 - **Transparent Overlay**: Frameless, fully transparent subtitle display with click-through support, ensuring it doesn't interfere with your operations.
 - **Environment Automation**: Uses `uv` for environment management, enabling one-click startup.
@@ -25,12 +25,12 @@ uv venv
 .venv\Scripts\activate
 uv pip install -r requirements.txt
 ```
-*(We have specifically designated the PyTorch CUDA 12.4 download location in `requirements.txt` to ensure GPU dual-engine support.)*
+*(We use `uv` for dependency management. GPU mode requires `nvidia-cublas-cu12` which is included in `requirements.txt`.)*
 
 ### 3. Download Model Weights
 Before running for the first time, it is highly recommended to double-click and execute `setup_models.bat` to pre-download the required model files.
 An interactive menu will pop up during execution, allowing you to choose freely:
-- **[1] Default Recommendation: Download GPU Model (PyTorch)** (approx. 2.3 GB), for NVIDIA graphics cards.
+- **[1] Default Recommendation: Download GPU Model (faster-whisper)** (approx. 3 GB), for NVIDIA graphics cards.
 - **[2] Download CPU Model (OpenVINO)** (approx. 1.2 GB), for Intel/general CPU usage.
 - **[3] Download Both**.
 
@@ -43,7 +43,7 @@ Before or during runtime, you can open and edit the `config.yaml` file in the pr
 #### **ASR Inference and Segmentation Control**
 - **asr.device**: Switch the inference engine
   - `CPU`: Use OpenVINO mode.
-  - `CUDA`: Use NVIDIA GPU PyTorch mode.
+  - `CUDA`: Use NVIDIA GPU mode (faster-whisper / CTranslate2).
   - `CUDA:X`: (e.g., `CUDA:0`) Specify a particular NVIDIA graphics card.
 - **asr.vad_threshold**: Voice detection sensitivity (default `0.3`).
   - **Lower value**: More sensitive, can capture faint human voices.
@@ -84,9 +84,10 @@ Double-click `start.bat` or run:
 
 This project is built upon the following amazing open-source projects and services:
 
-- **ASR Model**: [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by Alibaba Qwen Team.
+- **ASR Model (GPU)**: [Whisper large-v3](https://huggingface.co/Systran/faster-whisper-large-v3) by OpenAI, served via **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** (CTranslate2).
+- **ASR Model (CPU)**: [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by Alibaba Qwen Team, quantized to INT8 via OpenVINO.
 - **VAD Model**: [Silero VAD](https://github.com/snakers4/silero-vad) by Silero.
-- **Inference Engines**: [OpenVINO™ toolkit](https://github.com/openvinotoolkit/openvino) (Intel) and [PyTorch](https://pytorch.org/).
+- **Inference Engines**: [OpenVINO™ toolkit](https://github.com/openvinotoolkit/openvino) (Intel, for CPU mode) and [CTranslate2](https://github.com/OpenNMT/CTranslate2) (for GPU mode).
 - **Translation Services**: Google Translate, [DeepL](https://www.deepl.com/), and [Google Gemini](https://ai.google.dev/).
 - **GUI Framework**: [PySide6](https://pypi.org/project/PySide6/) (Qt for Python).
 - **Package Management**: [uv](https://github.com/astral-sh/uv) by Astral.

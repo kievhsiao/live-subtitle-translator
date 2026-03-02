@@ -1,6 +1,4 @@
-﻿--extra-index-url https://download.pytorch.org/whl/cu124
-
-# Core Audio & UI
+﻿# Core Audio & UI
 pyaudiowpatch
 PySide6
 numpy
@@ -14,13 +12,7 @@ google-genai
 silero-vad
 openvino
 onnxruntime
-
-# PyTorch & Qwen-ASR (NVIDIA GPU Support)
-torch==2.6.0+cu124
-torchvision==0.21.0+cu124
-torchaudio==2.6.0+cu124
-qwen-asr        # pulls in librosa, soundfile, requests, etc. as transitive deps
-accelerate
+faster-whisper
 
 # Utils
 pyyaml

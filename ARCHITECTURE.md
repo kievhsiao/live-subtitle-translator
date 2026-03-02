@@ -9,7 +9,7 @@
 ### 核心特色：
 - **雙引擎架構 (Dual-Engine)**：
   - **CPU 模式 (OpenVINO)**：針對缺乏高階獨立顯卡的電腦進行量化優化。
-  - **GPU 模式 (PyTorch/CUDA)**：提供高速且低延遲的推論，並支援切換指定的 NVIDIA 顯示卡。
+  - **GPU 模式 (faster-whisper/CTranslate2)**：以 Whisper large-v3 模型提供高速且低延遲的推論，並支援切換指定的 NVIDIA 顯示卡。
 - **共享資源設計**：共用的 VAD 模型與特徵過濾器被獨立存放，減少重複下載的浪費。
 - **動態分段**：具備智慧靜音偵測與長句強大切分保護，實現字幕的最高即時性。
 
@@ -24,14 +24,14 @@ live-subtitle-translator/
 ├── download_models.py          # 模型下載與檢查腳本
 ├── setup_models.bat            # 提供互動式選擇下載 (CPU/GPU) 的批次檔
 ├── start.bat                   # 系統啟動批次檔
-├── requirements.txt            # Python 套件依賴清單 (嚴格鎖定 CUDA 12.4 版本)
+├── requirements.txt            # Python 套件依賴清單
 │
 ├── models/                     # AI 模型資產目錄
 │   ├── common/                 # 雙引擎共用資源 (如 mel_filters.npy 特徵過濾器)
 │   ├── vad/                    # 共用語音活動偵測模型 (silero_vad_v4.onnx)
 │   ├── cpu/                    # OpenVINO 專用量化權重檔 (qwen3_asr_int8)
-│   └── gpu/                    # PyTorch/NVIDIA 共用原生權重庫
-│       └── Qwen3-ASR-0.6B/     # 從 HuggingFace 下載的快取模型
+│   └── gpu/                    # faster-whisper / CTranslate2 權重庫
+│       └── faster-whisper-large-v3/  # 從 HuggingFace 下載的 CTranslate2 格式模型
 │
 └── src/                        # 核心邏輯原始碼
     ├── asr_engine.py           # 語音辨識雙引擎介面實作
@@ -64,7 +64,7 @@ live-subtitle-translator/
 
 ### `src.asr_engine.ASREngine`
 - **職責**：擁有 `load()` 方法並對外隱藏實作細節。
-  - 當設定為 `CUDA` 時：以 `local_files_only=True` 透過 `qwen_asr` 載入 PyTorch 版本的 `Qwen3-ASR-0.6B` 模型，實現極低延遲的推論。
+  - 當設定為 `CUDA` 時：以 `faster-whisper` (CTranslate2) 載入 `Whisper large-v3` 模型，以 float16 推論實現極低延遲。
   - 當設定為 `CPU` 時：建立專案特製的 `Processor`，讀取 `models/cpu` 下的 ONNX 編碼與解碼圖譜，交由 OpenVINO 行推論。
 
 ### `src.processor_numpy`
