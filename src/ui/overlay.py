@@ -121,7 +121,7 @@ class SubtitleOverlay(QMainWindow):
             self.refresh_display()
 
     def refresh_display(self):
-        """Redraw all history items with current settings."""
+        """Redraw all history items with current settings (only for style changes)."""
         while self.layout.count():
             item = self.layout.takeAt(0)
             widget = item.widget()
@@ -130,6 +130,9 @@ class SubtitleOverlay(QMainWindow):
         
         for i, item in enumerate(self.history):
             item_widget = self._create_item_widget(item['original'], item['translated'])
+            item['container'] = item_widget
+            item['orig_label'] = item_widget.findChildren(QLabel)[0]
+            item['trans_label'] = item_widget.findChildren(QLabel)[1]
             self.layout.addWidget(item_widget)
 
     def _create_item_widget(self, original, translated):
@@ -189,17 +192,36 @@ class SubtitleOverlay(QMainWindow):
                     break
                     
         if target_item:
-            # 更新現有紀錄
-            if original: target_item['original'] = original
-            if translated: target_item['translated'] = translated
+            # --- 局部更新：直接修改現有 QLabel，避免全量重建 ---
+            if original:
+                target_item['original'] = original
+                if 'orig_label' in target_item:
+                    target_item['orig_label'].setText(original)
+            if translated:
+                target_item['translated'] = translated
+                if 'trans_label' in target_item:
+                    target_item['trans_label'].setText(translated)
         else:
             # 新增一筆
             uid = uid or str(uuid.uuid4())
-            self.history.append({'uid': uid, 'original': original, 'translated': translated})
-            if len(self.history) > self.history_size:
-                self.history.pop(0)
+            new_item = {'uid': uid, 'original': original, 'translated': translated}
             
-        self.refresh_display()
+            # 超過上限時移除最舊的
+            if len(self.history) >= self.history_size:
+                self.history.pop(0)
+                # 移除對應的 widget
+                layout_item = self.layout.takeAt(0)
+                if layout_item and layout_item.widget():
+                    layout_item.widget().deleteLater()
+            
+            # 建立新 widget 並加入
+            item_widget = self._create_item_widget(original, translated)
+            new_item['container'] = item_widget
+            new_item['orig_label'] = item_widget.findChildren(QLabel)[0]
+            new_item['trans_label'] = item_widget.findChildren(QLabel)[1]
+            self.history.append(new_item)
+            self.layout.addWidget(item_widget)
+            
         self.show()
         
         if hasattr(self, '_hide_timer'):

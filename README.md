@@ -53,8 +53,6 @@ Before or during runtime, you can open and edit the `config.yaml` file in the pr
   - Setting it too short will cause sentences to be chopped up; setting it too long will slow down subtitle popup.
 - **asr.max_segment_seconds**: Maximum seconds per single sentence (default `10.0`).
   - When this duration is reached, it will forcefully segment the speech even if there is no silence, preventing recognition lag caused by overly long sentences.
-- **asr.partial_interval**: Progressive translation update interval (default `0.8`).
-  - Controls how frequently partial transcriptions are pushed to the UI while still speaking, significantly improving perceived latency.
 
 #### **Subtitle Format Control (Subtitle)**
 - **subtitle.font_size**: Font size of the translated text (the original text will automatically adjust to a slightly smaller size).

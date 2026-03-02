@@ -23,7 +23,7 @@ class TranslatorApp:
         
         # UI
         self.app = QApplication(sys.argv)
-        self.settings_window = SettingsWindow(config_path)
+        self.settings_window = SettingsWindow(config_path, config=self.config)
         self.overlay = SubtitleOverlay(
             font_size=self.config['subtitle'].get('font_size', 24),
             font_color=self.config['subtitle'].get('font_color', '#FFFFFF'),
@@ -61,25 +61,22 @@ class TranslatorApp:
         print("Applying new configuration to running engines...")
         
         # Update Translator
-        if hasattr(self, 'translator'):
-            self.translator.provider = self.config['translation_provider']
-            self.translator.api_key = self.config['api_keys'].get(self.config['translation_provider'])
-            self.translator.target_lang = self.config['target_language']
+        self.translator.provider = self.config['translation_provider']
+        self.translator.api_key = self.config['api_keys'].get(self.config['translation_provider'])
+        self.translator.target_lang = self.config['target_language']
             
         # Update VAD
-        if hasattr(self, 'vad'):
-            self.vad.threshold = self.config['asr'].get('vad_threshold', 0.4)
+        self.vad.threshold = self.config['asr'].get('vad_threshold', 0.4)
             
         # Update Overlay
-        if hasattr(self, 'overlay'):
-            self.overlay.apply_settings(
-                font_size=self.config['subtitle'].get('font_size'),
-                font_color=self.config['subtitle'].get('font_color'),
-                bg_opacity=self.config['subtitle'].get('bg_opacity'),
-                history_size=self.config['subtitle'].get('history_size'),
-                line_spacing=self.config['subtitle'].get('line_spacing'),
-                display_duration=self.config['subtitle'].get('display_duration')
-            )
+        self.overlay.apply_settings(
+            font_size=self.config['subtitle'].get('font_size'),
+            font_color=self.config['subtitle'].get('font_color'),
+            bg_opacity=self.config['subtitle'].get('bg_opacity'),
+            history_size=self.config['subtitle'].get('history_size'),
+            line_spacing=self.config['subtitle'].get('line_spacing'),
+            display_duration=self.config['subtitle'].get('display_duration')
+        )
             
     def start_system(self):
         if self.running:
@@ -125,16 +122,21 @@ class TranslatorApp:
             self.settings_window.start_btn.setText("啟動失敗，請重試")
 
     async def process_loop(self):
-        import librosa
-        
         speech_buffer = []
         silence_count = 0
         current_uid = None
         
-        raw_buffer = [] # Buffer for incoming raw chunks
-        processed_16k_buffer = np.array([], dtype=np.float32)
+        pending_samples = []  # list of np.ndarray chunks (取代反覆 np.concatenate)
         
         target_sr = 16000
+        
+        # 預計算降頻比率（啟動後取樣率不變，只需算一次）
+        native_rate = self.capture.actual_rate
+        channels = self.capture.channels
+        downsample_ratio = native_rate / target_sr
+        is_integer_ratio = (downsample_ratio == int(downsample_ratio))
+        if is_integer_ratio:
+            downsample_step = int(downsample_ratio)
         
         while self.running:
             # --- 延遲優化：Queue Draining (佇列抽乾) ---
@@ -154,30 +156,33 @@ class TranslatorApp:
             combined_chunk_data = b"".join(chunks)
                 
             # 1. Convert to float32 mono at native rate
-            native_rate = self.capture.actual_rate
-            channels = self.capture.channels
-            
             audio_native = np.frombuffer(combined_chunk_data, dtype=np.int16).astype(np.float32) / 32768.0
             if channels > 1:
                 audio_native = audio_native.reshape(-1, channels).mean(axis=1)
             
-            # 2. Resample to 16kHz (延遲優化：針對最常見的 48kHz 使用極速降頻)
-            if native_rate == 48000 and target_sr == 16000:
-                # O(1) 極速硬降頻：每 3 個取 1 個
-                audio_16k = audio_native[::3]
-            elif native_rate != target_sr:
-                # 退回使用 librosa，但因為是合併後的大塊，效能也比之前好很多
-                audio_16k = librosa.resample(audio_native, orig_sr=native_rate, target_sr=target_sr)
-            else:
+            # 2. Resample to 16kHz（取樣率分級處理，無 librosa 依賴）
+            if native_rate == target_sr:
                 audio_16k = audio_native
+            elif is_integer_ratio:
+                # 快速路徑：整數倍降頻（48kHz→16kHz, 96kHz→16kHz 等）
+                audio_16k = audio_native[::downsample_step]
+            else:
+                # 慢速路徑：非整數倍，用 scipy（已是專案間接依賴）
+                from scipy.signal import resample_poly
+                from math import gcd
+                g = gcd(target_sr, native_rate)
+                audio_16k = resample_poly(audio_native, up=target_sr // g, down=native_rate // g).astype(np.float32)
                 
-            # 3. Add to processed buffer
-            processed_16k_buffer = np.concatenate([processed_16k_buffer, audio_16k])
+            # 3. 加入 pending list（避免每次 np.concatenate）
+            pending_samples.append(audio_16k)
             
-            # 4. Extract 512-sample chunks for VAD
-            while len(processed_16k_buffer) >= 512:
-                vad_chunk = processed_16k_buffer[:512]
-                processed_16k_buffer = processed_16k_buffer[512:]
+            # 4. 合併一次，逐 512 送 VAD
+            combined = np.concatenate(pending_samples)
+            pending_samples.clear()
+            
+            while len(combined) >= 512:
+                vad_chunk = combined[:512]
+                combined = combined[512:]
                 is_speech, prob = self.vad.is_speech(vad_chunk)
                 
                 if is_speech:
@@ -211,6 +216,10 @@ class TranslatorApp:
                     speech_buffer = []
                     silence_count = 0
                     current_uid = None
+            
+            # 保留不足 512 的剩餘 samples
+            if len(combined) > 0:
+                pending_samples.append(combined)
             
             # Yield control explicitly so ASR tasks can start
             await asyncio.sleep(0)

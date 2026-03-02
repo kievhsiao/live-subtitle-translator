@@ -11,10 +11,13 @@ class SettingsWindow(QMainWindow):
     """Main dashboard for configuration and control."""
     settings_saved = Signal(dict)
     
-    def __init__(self, config_path="config.yaml"):
+    def __init__(self, config_path="config.yaml", config=None):
         super().__init__()
         self.config_path = config_path
-        self._load_config()
+        if config is not None:
+            self.config = config
+        else:
+            self._load_config()
         
         self.setWindowTitle("即時翻譯字幕系統 - 設定")
         self.resize(550, 750) # 增大容量

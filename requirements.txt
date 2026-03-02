@@ -3,12 +3,10 @@
 # Core Audio & UI
 pyaudiowpatch
 PySide6
-soundfile
-librosa
 numpy
+scipy
 
 # Translation
-google-cloud-translate
 deepl
 google-genai
 
@@ -16,13 +14,12 @@ google-genai
 silero-vad
 openvino
 onnxruntime
-opencc
 
 # PyTorch & Qwen-ASR (NVIDIA GPU Support)
 torch==2.6.0+cu124
 torchvision==0.21.0+cu124
 torchaudio==2.6.0+cu124
-qwen-asr
+qwen-asr        # pulls in librosa, soundfile, requests, etc. as transitive deps
 accelerate
 
 # Utils

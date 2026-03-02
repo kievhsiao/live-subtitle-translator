@@ -1,9 +1,7 @@
 import asyncio
 import aiohttp
-import os
 from google import genai
 from google.genai import types
-from google.cloud import translate_v2 as translate
 import deepl
 
 class Translator:

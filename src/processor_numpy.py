@@ -94,45 +94,6 @@ def _mel_filters(model_dir: Path | None = None) -> np.ndarray:
 _HANN_WINDOW: np.ndarray = np.hanning(_N_FFT + 1)[:-1].astype(np.float32)
 
 
-def extract_mel(audio: np.ndarray) -> np.ndarray:
-    """
-    輸入：float32 音頻，16kHz，任意長度
-    輸出：[1, 128, 3000] float32 mel 矩陣
-
-    與 transformers WhisperFeatureExtractor 行為完全對齊：
-      • 先截斷/補零至 n_samples = 480000（30 秒）
-      • center=True：兩端各加 n_fft//2 = 200 個反射樣本
-      • 滑窗 STFT（週期漢寧窗）→ 取前 3000 frames
-    """
-    # 1. 截斷至 n_samples；若更短則補零（center padding 前需補足）
-    audio = audio.astype(np.float32)
-    if len(audio) > _N_SAMPLES:
-        audio = audio[:_N_SAMPLES]
-    if len(audio) < _N_SAMPLES:
-        audio = np.pad(audio, (0, _N_SAMPLES - len(audio)))  # 補零至 480000
-
-    # 2. center=True：兩端各加 n_fft//2 個反射樣本 → 480400 個樣本
-    half = _N_FFT // 2  # 200
-    audio_c = np.pad(audio, half, mode="reflect")             # (480400,)
-
-    # 3. sliding_window_view → 3001 frames（取前 3000）
-    frames = np.lib.stride_tricks.sliding_window_view(audio_c, _N_FFT)[::_HOP]
-    frames = frames[:_NB_FRAMES].astype(np.float32)           # (3000, 400)
-    windowed = frames * _HANN_WINDOW                           # (3000, 400)
-
-    # 4. FFT → power spectrum
-    stft  = np.fft.rfft(windowed, axis=1)                     # (3000, 201)
-    power = np.abs(stft).astype(np.float32) ** 2              # (3000, 201)
-
-    # 5. Mel filterbank
-    mel = (_load_mel_filters() @ power.T)                     # (128, 3000)
-
-    # 6. Log scale + Whisper 正規化
-    log_mel = np.log10(np.maximum(mel, 1e-10))
-    log_mel = np.maximum(log_mel, log_mel.max() - 8.0)
-    log_mel = (log_mel + 4.0) / 4.0
-
-    return log_mel[np.newaxis, :, :].astype(np.float32)       # (1, 128, 3000)
 
 
 # ══════════════════════════════════════════════════════════════════════
