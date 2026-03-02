@@ -165,12 +165,12 @@ class LightProcessor:
         self._model_dir = model_dir
 
         # ── 讀取 prompt template ──────────────────────────────────────
-        # 搜尋順序：OV_DIR（模型特定設定優先）→ BASE_DIR → 本檔案同層
+        # 搜尋順序：OV_DIR（模型特定設定優先）→ models/ → src/（本檔案同層，預設位置）
         tpl_path = model_dir / "prompt_template.json"
         if not tpl_path.exists():
             tpl_path = model_dir.parent.parent / "prompt_template.json"
         if not tpl_path.exists():
-            tpl_path = Path(__file__).parent / "prompt_template.json"
+            tpl_path = Path(__file__).parent / "prompt_template.json"  # src/
         with open(tpl_path, "r", encoding="utf-8") as f:
             tpl = json.load(f)
 
