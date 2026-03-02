@@ -5,7 +5,7 @@ echo             Model Downloader
 echo =========================================
 echo.
 echo Please select which models to download:
-echo [1] GPU Model Only (Recommended, ~2.3GB)
+echo [1] GPU Model Only (Recommended, ~3GB)
 echo [2] CPU Model Only (OpenVINO, ~1.2GB)
 echo [3] Download Both Models
 echo.

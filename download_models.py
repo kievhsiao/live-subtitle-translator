@@ -67,16 +67,16 @@ def download_cpu():
     print("If mel_filters.npy is missing, please copy it from QwenASRMiniTool.")
 
 def download_gpu():
-    print("\n=== Downloading GPU Models (PyTorch) ===")
+    print("\n=== Downloading GPU Models (faster-whisper / CTranslate2) ===")
     try:
         from huggingface_hub import snapshot_download
-        local_model_dir = Path("models/gpu/Qwen3-ASR-0.6B")
+        local_model_dir = Path("models/gpu/faster-whisper-large-v3")
         
         if not local_model_dir.exists():
-            print("Downloading Qwen3-ASR-0.6B to local GPU directory (This may take a while)...")
+            print("Downloading faster-whisper-large-v3 to local GPU directory (This may take a while, ~3GB)...")
             local_model_dir.parent.mkdir(parents=True, exist_ok=True)
             snapshot_download(
-                repo_id="Qwen/Qwen3-ASR-0.6B",
+                repo_id="Systran/faster-whisper-large-v3",
                 local_dir=str(local_model_dir),
                 local_dir_use_symlinks=False,
                 resume_download=True
